@@ -49,10 +49,6 @@
 #endif
 
 /**
- * Indicate if evdev brain has been started yet.
- */
-static Bool evdev_alive = FALSE;
-/**
  * Pointer to the "evdev brain".
  * Note that this is a list, so evdev_pInfo->next will point to other devices
  * (albeit not evdev ones).
@@ -496,13 +492,11 @@ evdevStart (InputDriverPtr drv)
 {
     InputInfoRec *pInfo;
 
-    if (evdev_alive)
+    if (evdev_pInfo)
 	return TRUE;
 
     if (!(pInfo = xf86AllocateInput(drv, 0)))
 	return FALSE;
-
-    evdev_alive = TRUE;
 
     pInfo->name = "evdev brain";
     pInfo->type_name = "evdev brain";
@@ -526,7 +520,7 @@ evdevStart (InputDriverPtr drv)
 Bool
 evdevNewDriver (evdevDriverPtr driver)
 {
-    if (!evdev_alive)
+    if (!evdev_pInfo)
 	return FALSE;
     /* FIXME: Make this check valid given all the ways to look. */
 #if 0
@@ -553,21 +547,26 @@ evdevNewDriver (evdevDriverPtr driver)
  * @param pEvdev The device to remove.
  */
 void
-evdevRemoveDevice (evdevDevicePtr pEvdev)
+evBrainRemoveDevice(InputInfoPtr pInfo)
 {
-    evdevDriverPtr driver;
-    evdevDevicePtr *device;
+    if (evdev_pInfo == pInfo)
+	evdev_pInfo = NULL;
+    else {
+	 evdevDriverPtr driver;
+	 evdevDevicePtr device = NULL, prev = NULL;
 
-    for (driver = evdev_drivers; driver; driver = driver->next) {
-        for (device = &driver->devices; *device; device = &(*device)->next) {
-            if (*device == pEvdev) {
-                *device = pEvdev->next;
-                xf86DeleteInput(pEvdev->pInfo, 0);
-                pEvdev->next = NULL;
-                if (!driver->devices)
-                return;
-            }
-        }
+	for (driver = evdev_drivers; driver; driver = driver->next)
+	    for (device = driver->devices; device; prev = device, device = device->next)
+		if (device->pInfo == pInfo)
+		    break;
+
+	if (device) {
+	    if (prev)
+		prev->next = device->next;
+	    else
+		driver->devices = device->next;
+	    xfree(device);
+	}
     }
 }
 

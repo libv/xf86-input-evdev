@@ -214,9 +214,6 @@ EvdevProc(DeviceIntPtr device, int what)
 		EvdevKeyOff (device);
 	}
 
-        if (what == DEVICE_CLOSE)
-            evdevRemoveDevice(pEvdev);
-
 	device->public.on = FALSE;
 	break;
     }
@@ -464,6 +461,22 @@ EvdevCorePreInit(InputDriverPtr drv, IDevPtr dev, int flags)
     return NULL;
 }
 
+/*
+ *
+ * Wrap around xf86DeleteInput since we track some things statically
+ * in the driver.
+ *
+ */
+static void
+evdevCoreUnInit(struct _InputDriverRec *drv, struct _LocalDeviceRec *localdev,
+		int flags)
+{
+    InputInfoPtr pInfo = localdev;
+
+    evBrainRemoveDevice(pInfo);
+
+    xf86DeleteInput(pInfo, flags);
+}
 
 
 _X_EXPORT InputDriverRec EVDEV = {
@@ -471,7 +484,7 @@ _X_EXPORT InputDriverRec EVDEV = {
     "evdev",
     NULL,
     EvdevCorePreInit,
-    NULL,
+    evdevCoreUnInit,
     NULL,
     0
 };
